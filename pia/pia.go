@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -57,6 +58,7 @@ type AddKeyResult struct {
 	Status     string   `json:"status"`
 	ServerKey  string   `json:"server_key"`
 	ServerPort int      `json:"server_port"`
+	ServerName string   `json:"server_name"`
 	ServerIP   string   `json:"server_ip"`
 	ServerVip  string   `json:"server_vip"`
 	PeerIP     string   `json:"peer_ip"`
@@ -163,6 +165,8 @@ func (p *PIAClient) AddKey(token, publickey string) (AddKeyResult, error) {
 		return addKeyResp, errors.Wrap(err, "error decoding add key response")
 	}
 
+	addKeyResp.ServerName = server.Cn
+
 	return addKeyResp, nil
 }
 
@@ -174,7 +178,7 @@ func (p *PIAClient) getWireguardServerForRegion() Server {
 	if len(servers) == 0 {
 		log.Fatalf("No Wireguard servers available for region: %s", p.region)
 	}
-	return servers[0]
+	return servers[rand.IntN(len(servers))]
 }
 
 func (p *PIAClient) getMetadataServerForRegion() Server {
@@ -192,7 +196,7 @@ func (p *PIAClient) getMetadataServerForRegion() Server {
 func (p *PIAClient) getServerList() (piaServerList, error) {
 	var serverList piaServerList
 
-	resp, err := http.Get("https://serverlist.piaservers.net/vpninfo/servers/v4")
+	resp, err := http.Get("https://serverlist.piaservers.net/vpninfo/servers/v7")
 	if err != nil {
 		return piaServerList{}, err
 	}
