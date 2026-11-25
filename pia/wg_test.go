@@ -16,6 +16,7 @@ func (p *PIAClientMock) AddKey(token, publickey string) (AddKeyResult, error) {
 		DNSServers: []string{"1.1.1.1"},
 		PeerIP:     "4.5.6.7",
 		ServerKey:  publickey,
+		ServerName: "test-server",
 	}, nil
 }
 
@@ -43,7 +44,8 @@ func TestPIAWgGenerator_Generate(t *testing.T) {
 					PublicKey:  "test_publickey",
 				},
 			},
-			want: `[Interface]
+			want: `# ServerName = test-server
+[Interface]
 PrivateKey = test_privatekey
 Address = 4.5.6.7
 DNS = 1.1.1.1
