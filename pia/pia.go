@@ -31,6 +31,7 @@ type ServerList map[Region][]Server
 type PIAClient struct {
 	region           string
 	wireguardServers ServerList
+	portForward      bool
 	username         string
 	password         string
 	verbose          bool
@@ -43,20 +44,24 @@ type PIAClient struct {
 var piaCACert []byte
 
 type piaServerList struct {
-	Regions []struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Country     string `json:"country"`
-		AutoRegion  bool   `json:"auto_region"`
-		DNS         string `json:"dns"`
-		PortForward bool   `json:"port_forward"`
-		Geo         bool   `json:"geo"`
-		Offline     bool   `json:"offline"`
-		Servers     struct {
-			Meta []Server `json:"meta"`
-			Wg   []Server `json:"wg"`
-		} `json:"servers"`
-	} `json:"regions"`
+	Regions []piaRegion `json:"regions"`
+}
+
+type piaRegion struct {
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	Country     string           `json:"country"`
+	AutoRegion  bool             `json:"auto_region"`
+	DNS         string           `json:"dns"`
+	PortForward bool             `json:"port_forward"`
+	Geo         bool             `json:"geo"`
+	Offline     bool             `json:"offline"`
+	Servers     piaRegionServers `json:"servers"`
+}
+
+type piaRegionServers struct {
+	Meta []Server `json:"meta"`
+	Wg   []Server `json:"wg"`
 }
 
 type AddKeyResult struct {
@@ -91,15 +96,22 @@ func NewPIAClient(username, password, region string, verbose bool) (*PIAClient, 
 		return nil, errors.Wrap(err, "failed to fetch server list from PIA")
 	}
 
-	// Set servers
+	// Set servers and region capabilities.
 	piaClient.wireguardServers = piaClient.generateWireguardServerList(serverList)
 
 	// Validate region exists
-	if _, exists := piaClient.wireguardServers[Region(region)]; !exists {
+	regionInfo, exists := availableRegionsFromServerList(serverList)[Region(region)]
+	if !exists {
 		return nil, fmt.Errorf("region '%s' not found or has no online Wireguard servers. Use 'pia-wg-config regions' to see all available regions", region)
 	}
+	piaClient.portForward = regionInfo.PortForward
 
 	return &piaClient, nil
+}
+
+// SupportsPortForwarding reports whether this client's region supports PIA port forwarding.
+func (p *PIAClient) SupportsPortForwarding() bool {
+	return p.portForward
 }
 
 // tokenURL is PIA's central token API (the same endpoint used by PIA's
@@ -141,22 +153,49 @@ func (p *PIAClient) GetToken() (string, error) {
 	return tokenResp.Token, nil
 }
 
-// GetAvailableRegions returns all online regions that have Wireguard servers
+// RegionInfo describes a region from PIA's server list.
+type RegionInfo struct {
+	Name        string
+	PortForward bool
+}
+
+func availableRegionsFromServerList(serverList piaServerList) map[Region]RegionInfo {
+	regions := make(map[Region]RegionInfo, len(serverList.Regions))
+	for _, region := range serverList.Regions {
+		if region.Offline || len(region.Servers.Wg) == 0 {
+			continue
+		}
+		regions[Region(region.ID)] = RegionInfo{
+			Name:        region.Name,
+			PortForward: region.PortForward,
+		}
+	}
+	return regions
+}
+
+// GetAvailableRegions returns all online regions that have WireGuard servers.
+// The string value is the region's display name.
 func GetAvailableRegions() (map[Region]string, error) {
+	regionInfo, err := GetAvailableRegionInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	regions := make(map[Region]string, len(regionInfo))
+	for region, info := range regionInfo {
+		regions[region] = info.Name
+	}
+	return regions, nil
+}
+
+// GetAvailableRegionInfo returns online regions with WireGuard servers and their capabilities.
+func GetAvailableRegionInfo() (map[Region]RegionInfo, error) {
 	serverList, err := getServerList()
 	if err != nil {
 		return nil, err
 	}
 
-	regions := make(map[Region]string)
-	for _, r := range serverList.Regions {
-		if r.Offline || len(r.Servers.Wg) == 0 {
-			continue
-		}
-		regions[Region(r.ID)] = r.Name
-	}
-
-	return regions, nil
+	return availableRegionsFromServerList(serverList), nil
 }
 
 // AddKey registers publickey with the region's Wireguard server, like

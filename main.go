@@ -43,6 +43,11 @@ func main() {
 				Value:   false,
 				Usage:   "Print verbose output",
 			},
+			&cli.BoolFlag{
+				Name:    "port-forwarding",
+				Aliases: []string{"p"},
+				Usage:   "Require the selected region to support PIA port forwarding",
+			},
 		},
 	}
 
@@ -98,6 +103,10 @@ func defaultAction(c *cli.Context) error {
 		return cli.Exit("", 1)
 	}
 
+	if err := validatePortForwarding(region, c.Bool("port-forwarding"), piaClient.SupportsPortForwarding()); err != nil {
+		return cli.Exit(err.Error(), 1)
+	}
+
 	// create wg config generator
 	if verbose {
 		log.Print("creating wg config generator")
@@ -145,26 +154,41 @@ func defaultAction(c *cli.Context) error {
 func listRegions(c *cli.Context) error {
 	fmt.Println("Fetching available regions from PIA...")
 
-	regions, err := pia.GetAvailableRegions()
+	regions, err := pia.GetAvailableRegionInfo()
 	if err != nil {
 		return fmt.Errorf("failed to get regions: %v", err)
 	}
 
 	// Sort regions for consistent output
 	var regionList []string
+	width := 0
 	for region := range regions {
 		regionList = append(regionList, string(region))
+		width = max(width, len(region))
 	}
 	sort.Strings(regionList)
 
 	fmt.Println("\nAvailable PIA regions:")
 	fmt.Println("======================")
+	portForwardCount := 0
 	for _, region := range regionList {
-		fmt.Printf("  %s\n", region)
+		if regions[pia.Region(region)].PortForward {
+			portForwardCount++
+			fmt.Printf("  %-*s  (port forwarding)\n", width, region)
+		} else {
+			fmt.Printf("  %s\n", region)
+		}
 	}
-	fmt.Printf("\nTotal: %d regions available\n", len(regionList))
+	fmt.Printf("\nTotal: %d regions available, %d with port forwarding\n", len(regionList), portForwardCount)
 	fmt.Println("\nUsage example:")
-	fmt.Println("  pia-wg-config -r uk USERNAME PASSWORD")
+	fmt.Println("  pia-wg-config -p -r ca_vancouver USERNAME PASSWORD")
 
+	return nil
+}
+
+func validatePortForwarding(region string, required, supported bool) error {
+	if required && !supported {
+		return fmt.Errorf("region '%s' does not support port forwarding (run 'pia-wg-config regions' to see which regions do)", region)
+	}
 	return nil
 }

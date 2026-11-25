@@ -16,5 +16,6 @@ Go CLI that generates WireGuard configs for Private Internet Access (PIA). Publi
 - Go 1.27 (go directive `1.27.0`, toolchain `go1.27.2`); flake pins nixpkgs `go_1_27` with `GOTOOLCHAIN=local`. Keep `.github/workflows/ci.yml` on the same version.
 - No `vendor/` — modules are fetched normally.
 - Never log credentials, tokens or private keys; generated `*.conf` files contain private keys and are gitignored. The addKey token travels in the URL query, so never surface a `*url.Error` from that request unmodified.
+- `-p/--port-forwarding` validates the selected region's `port_forward` capability from PIA's server list before requesting a token; `regions` marks eligible regions.
 - Endpoints and response handling mirror PIA's `pia-foss/manual-connections` scripts (`get_region.sh`, `get_token.sh`, `connect_to_wireguard_with_token.sh`); check there first when PIA changes something. Config `Endpoint` is `server_ip:server_port` from the addKey response.
 - Branch `wip/stdlib-cli` holds an unfinished stdlib-only CLI rewrite (drops urfave/cli, pkg/errors, dns).

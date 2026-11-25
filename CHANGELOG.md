@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `-p/--port-forwarding` to require a port-forwarding-capable region; `regions` marks eligible regions
 - `regions` command to list all available PIA regions
 - Enhanced CLI help text to emphasize region configurability
 - `GetAvailableRegions()` method to PIA client

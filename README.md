@@ -93,11 +93,18 @@ pia-wg-config [OPTIONS] USERNAME PASSWORD
 - `-r, --region` - Region to connect to (default: "us_california")
 - `-o, --outfile` - Output file for the config (default: stdout)
 - `-v, --verbose` - Enable verbose output
+- `-p, --port-forwarding` - Require the selected region to support PIA port forwarding
 - `-h, --help` - Show help
 
 ### Subcommands
 
-- `pia-wg-config regions` - List all available PIA regions
+- `pia-wg-config regions` - List all available PIA regions and mark port-forwarding regions
+
+Use `-p` when generating a config for port forwarding. The command fails before requesting a token if the selected region does not support it:
+
+```bash
+pia-wg-config -p -r ca_vancouver USERNAME PASSWORD
+```
 
 ## 🌐 Popular Regions
 

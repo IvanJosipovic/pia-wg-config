@@ -4,10 +4,68 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"strings"
 	"testing"
 )
+
+func TestAvailableRegionsPortForwarding(t *testing.T) {
+	const response = `{
+		"regions": [
+			{
+				"id": "ca_vancouver",
+				"name": "CA Vancouver",
+				"port_forward": true,
+				"servers": {"wg": [{"cn": "Server-1", "ip": "192.0.2.1"}]}
+			},
+			{
+				"id": "us_california",
+				"name": "US California",
+				"port_forward": false,
+				"servers": {"wg": [{"cn": "Server-2", "ip": "192.0.2.2"}]}
+			},
+			{
+				"id": "offline",
+				"name": "Offline",
+				"port_forward": true,
+				"offline": true,
+				"servers": {"wg": [{"cn": "Server-3", "ip": "192.0.2.3"}]}
+			},
+			{
+				"id": "no-wireguard",
+				"name": "No WireGuard",
+				"port_forward": true,
+				"servers": {"wg": []}
+			}
+		]
+	}`
+
+	var serverList piaServerList
+	if err := json.Unmarshal([]byte(response), &serverList); err != nil {
+		t.Fatalf("unmarshal server list: %v", err)
+	}
+
+	regions := availableRegionsFromServerList(serverList)
+	if len(regions) != 2 {
+		t.Fatalf("got %d available regions, want 2", len(regions))
+	}
+	if !regions["ca_vancouver"].PortForward {
+		t.Error("ca_vancouver should support port forwarding")
+	}
+	if regions["ca_vancouver"].Name != "CA Vancouver" {
+		t.Errorf("ca_vancouver name = %q, want %q", regions["ca_vancouver"].Name, "CA Vancouver")
+	}
+	if regions["us_california"].PortForward {
+		t.Error("us_california should not support port forwarding")
+	}
+	if _, ok := regions["offline"]; ok {
+		t.Error("offline region should not be listed")
+	}
+	if _, ok := regions["no-wireguard"]; ok {
+		t.Error("region without WireGuard servers should not be listed")
+	}
+}
 
 // TestEmbeddedCACert pins the embedded PIA CA so it cannot be swapped silently.
 func TestEmbeddedCACert(t *testing.T) {
